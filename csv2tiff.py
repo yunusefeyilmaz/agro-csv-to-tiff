@@ -16,39 +16,39 @@ class CSVToTIFFConverter:
         self.delimiter = delimiter
 
     def convert(self):
-        # Read the CSV file
-        df = pd.read_csv(self.file, header=self.header, names=['idx', 'classId'], dtype={'idx': 'str', 'classId': 'str'}, delimiter=self.delimiter)
+        try:
+            # Read the CSV file
+            df = pd.read_csv(self.file, header=self.header, names=['idx', 'classId'], dtype={'idx': 'str', 'classId': 'str'}, delimiter=self.delimiter)
 
-        # Convert data to numeric
-        df['idx'] = pd.to_numeric(df['idx'], errors='coerce')
-        df['classId'] = pd.to_numeric(df['classId'], errors='coerce')
+            # Convert data to numeric and drop NaN values
+            df['idx'] = pd.to_numeric(df['idx'], errors='coerce')
+            df['classId'] = pd.to_numeric(df['classId'], errors='coerce')
+            df.dropna(inplace=True)
 
-        # Drop NaN values
-        df.dropna(inplace=True)
+            # Convert data to numpy arrays
+            idx = df['idx'].values.astype(int)
+            classId = df['classId'].values.astype(int)
 
-        # Convert data to numpy arrays
-        idx = df['idx'].values.astype(int)
-        classId = df['classId'].values.astype(int)
+            # Create an empty grid
+            raster_data = np.zeros((self.height, self.width), dtype=np.uint8)
 
-        # Create an empty grid
-        raster_data = np.zeros((self.height, self.width), dtype=np.uint8)
+            # Populate the grid with data
+            x_coords = idx % self.width
+            y_coords = idx // self.width
+            valid_indices = (y_coords < self.height) & (x_coords < self.width)
+            raster_data[y_coords[valid_indices], x_coords[valid_indices]] = classId[valid_indices]
 
-        # Populate the grid with data
-        for i in range(len(idx)):
-            x = idx[i] % self.width
-            y = idx[i] // self.width
-            if y < self.height and x < self.width:
-                raster_data[y, x] = classId[i]
-
-        # Create and save the image
-        fig, ax = plt.subplots(figsize=(self.width / 100, self.height / 100), dpi=self.dpi)
-        cmap = plt.get_cmap(self.cmap)
-        norm = mcolors.Normalize(vmin=raster_data.min(), vmax=raster_data.max())
-        img = ax.imshow(raster_data, cmap=cmap, norm=norm)
-        plt.axis('off')
-        plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
-        plt.savefig(self.output + '.tiff', format='tiff', dpi=self.dpi)
-        plt.close()
+            # Create and save the image
+            fig, ax = plt.subplots(figsize=(self.width / 100, self.height / 100), dpi=self.dpi)
+            cmap = plt.get_cmap(self.cmap)
+            norm = mcolors.Normalize(vmin=raster_data.min(), vmax=raster_data.max())
+            ax.imshow(raster_data, cmap=cmap, norm=norm)
+            plt.axis('off')
+            plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+            plt.savefig(self.output + '.tiff', format='tiff', dpi=self.dpi)
+            plt.close()
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
 def main():
     # Read args from command line
