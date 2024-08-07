@@ -1,17 +1,14 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
+from PIL import Image
 import argparse
 
 class CSVToTIFFConverter:
-    def __init__(self, file, width, height, output='output', dpi=100, cmap='gray', header=None, delimiter=','):
+    def __init__(self, file, width, height, output='output', header=None, delimiter=','):
         self.file = file
         self.output = output
         self.width = width
         self.height = height
-        self.dpi = dpi
-        self.cmap = cmap
         self.header = header
         self.delimiter = delimiter
 
@@ -29,24 +26,19 @@ class CSVToTIFFConverter:
             idx = df['idx'].values.astype(int)
             classId = df['classId'].values.astype(int)
 
-            # Create an empty grid
-            raster_data = np.zeros((self.height, self.width), dtype=np.uint8)
+            # Create an empty RGBA grid (R=Gray, A=Alpha)
+            raster_data = np.zeros((self.height, self.width, 2), dtype=np.uint8)
 
             # Populate the grid with data
             x_coords = idx % self.width
             y_coords = idx // self.width
             valid_indices = (y_coords < self.height) & (x_coords < self.width)
-            raster_data[y_coords[valid_indices], x_coords[valid_indices]] = classId[valid_indices]
+            raster_data[y_coords[valid_indices], x_coords[valid_indices], 0] = classId[valid_indices]  # Set gray value
+            raster_data[y_coords[valid_indices], x_coords[valid_indices], 1] = 255  # Set alpha to 255 (opaque) where there's data
 
-            # Create and save the image
-            fig, ax = plt.subplots(figsize=(self.width / 100, self.height / 100), dpi=self.dpi)
-            cmap = plt.get_cmap(self.cmap)
-            norm = mcolors.Normalize(vmin=raster_data.min(), vmax=raster_data.max())
-            ax.imshow(raster_data, cmap=cmap, norm=norm)
-            plt.axis('off')
-            plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
-            plt.savefig(self.output + '.tiff', format='tiff', dpi=self.dpi)
-            plt.close()
+            # Convert to grayscale with alpha
+            img = Image.fromarray(raster_data, mode='LA')  # 'LA' mode for grayscale with alpha
+            img.save(self.output + '.tiff', format='TIFF')
         except Exception as e:
             print(f"An error occurred: {e}")
 
@@ -57,8 +49,6 @@ def main():
     parser.add_argument('--output', type=str, default='output', help='Output file name')
     parser.add_argument('--width', type=int, required=True, help='Width of the grid')
     parser.add_argument('--height', type=int, required=True, help='Height of the grid')
-    parser.add_argument('--dpi', type=int, default=100, help='DPI of the output image')
-    parser.add_argument('--cmap', type=str, default='gray', help='Color map of the output image')
     parser.add_argument('--header', type=int, default=None, help='Header of the CSV file')
     parser.add_argument('--delimiter', type=str, default=',', help='Delimiter of the CSV file')
 
@@ -69,8 +59,6 @@ def main():
         output=args.output,
         width=args.width,
         height=args.height,
-        dpi=args.dpi,
-        cmap=args.cmap,
         header=args.header,
         delimiter=args.delimiter
     )
