@@ -4,7 +4,7 @@ import argparse
 from osgeo import gdal, osr
 
 class CSVToGeoTIFFConverter:
-    def __init__(self, file, output, width, height, pixel_size=1000,minx=0.0,maxy=0.0,epsg=4326):
+    def __init__(self, file, output, width, height, pixel_size_x=1000, pixel_size_y=-1000, minx=0.0, maxy=0.0, epsg=4326):
         """
         Initialize the converter with the input CSV file and output TIFF file name.
         
@@ -12,13 +12,15 @@ class CSVToGeoTIFFConverter:
         :param output: Path to the output TIFF file.
         :param width: Width of the output image.
         :param height: Height of the output image.
-        :param pixel_size: Size of each pixel in the output image.
+        :param pixel_size_x: Size of each pixel in the x direction.
+        :param pixel_size_y: Size of each pixel in the y direction.
         """
         self.file = file
         self.output = output
         self.width = width
         self.height = height
-        self.pixel_size = pixel_size
+        self.pixel_size_x = pixel_size_x
+        self.pixel_size_y = pixel_size_y
         self.minx = minx 
         self.maxy = maxy 
         self.epsg = epsg 
@@ -43,15 +45,13 @@ class CSVToGeoTIFFConverter:
                     if y < self.height and x < self.width:
                         img[y, x] = classId
 
-            
-
-            # Calculate statistics. dont inculde NaN values
+            # Calculate statistics, don't include NaN values
             min_val = float(img[~np.isnan(img)].min())
             max_val = float(img[~np.isnan(img)].max())
             mean_val = float(img[~np.isnan(img)].mean())
             stddev_val = float(img[~np.isnan(img)].std())
 
-            #write nan to 0
+            # Write NaN to 0
             img[np.isnan(img)] = 0.0
 
             # Create the GeoTIFF file
@@ -59,10 +59,10 @@ class CSVToGeoTIFFConverter:
             dataset = driver.Create(self.output, self.width, self.height, 1, gdal.GDT_Float32)
 
             # Set geotransform and projection
-            dataset.SetGeoTransform([self.minx, self.pixel_size, 0, self.maxy, 0, -self.pixel_size])
+            dataset.SetGeoTransform([self.minx, self.pixel_size_x, 0, self.maxy, 0, self.pixel_size_y])
             
             srs = osr.SpatialReference()
-            srs.ImportFromEPSG(self.epsg)  # Example projection
+            srs.ImportFromEPSG(int(self.epsg))  # Example projection
             dataset.SetProjection(srs.ExportToWkt())
 
             # Write the image data to the band
@@ -90,14 +90,15 @@ def main():
     parser.add_argument('--output', type=str, default='output.tiff', help='Output TIFF file name')
     parser.add_argument('--width', type=int, required=True, help='Width of the output image')
     parser.add_argument('--height', type=int, required=True, help='Height of the output image')
-    parser.add_argument('--pixel_size', type=int, default=1000, help='Size of each pixel in the output image')
+    parser.add_argument('--pixel_size_x', type=int, default=1000, help='Size of each pixel in the x direction')
+    parser.add_argument('--pixel_size_y', type=int, default=1000, help='Size of each pixel in the y direction')
     parser.add_argument('--x', type=float, default=0, help='Minimum x coordinate')
     parser.add_argument('--y', type=float, default=0, help='Maximum y coordinate')
     parser.add_argument('--epsg', type=int, default=4326, help='EPSG code of the projection')
 
     args = parser.parse_args()
 
-    converter = CSVToGeoTIFFConverter(file=args.file, output=args.output, width=args.width, height=args.height, pixel_size=args.pixel_size, minx=args.x, maxy=args.y, epsg=args.epsg)
+    converter = CSVToGeoTIFFConverter(file=args.file, output=args.output, width=args.width, height=args.height, pixel_size_x=args.pixel_size_x, pixel_size_y=args.pixel_size_y, minx=args.x, maxy=args.y, epsg=args.epsg)
     converter.convert()
 
 if __name__ == '__main__':
